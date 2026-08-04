@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Link Locker — Unlock Your Link</title>
 <meta name="description" content="Unlock your link in two quick steps." />
-<link rel="stylesheet" href="style.css" />
+<!-- Cache-busting: bump ?v=X.X.X on every deploy (index.html, admin.html,
+     script.js, admin.js) so users get the update without clearing cache -->
+<link rel="stylesheet" href="style.css?v=1.0.1" />
 </head>
 <body>
 
@@ -111,7 +113,7 @@
     </div>
   </div>
 
-  <script src="adblock.js"></script>
-  <script type="module" src="script.js"></script>
+  <script src="adblock.js?v=1.0.1"></script>
+  <script type="module" src="script.js?v=1.0.1"></script>
 </body>
 </html>

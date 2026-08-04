@@ -22,7 +22,7 @@ import {
   collection,
   addDoc,
   serverTimestamp,
-} from "./firebase.js";
+} from "./firebase.js?v=1.0.1";
 
 // ---------- DOM refs ----------
 const loadingState = document.getElementById("loading-state");
