@@ -40,12 +40,13 @@ import {
 // 🔧 REPLACE WITH YOUR OWN FIREBASE PROJECT CONFIG
 // ---------------------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBlNqJzt_1xY_v1z171xyy8DCoYL-UMUlU",
+  authDomain: "link-locker-51809.firebaseapp.com",
+  projectId: "link-locker-51809",
+  storageBucket: "link-locker-51809.firebasestorage.app",
+  messagingSenderId: "902805318013",
+  appId: "1:902805318013:web:079aa3061b93e167698414",
+  measurementId: "G-ZVZQ1DD596"
 };
 
 const app = initializeApp(firebaseConfig);
