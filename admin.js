@@ -17,9 +17,11 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  getDocs,
   serverTimestamp,
   Timestamp,
-} from "./firebase.js?v=1.0.1";
+} from "./firebase.js?v=1.0.2";
 
 // ---------- DOM refs ----------
 const loginView = document.getElementById("login-view");
@@ -38,6 +40,16 @@ const linksView = document.getElementById("links-view");
 const statTotalLinks = document.getElementById("stat-total-links");
 const statTotalUnlocks = document.getElementById("stat-total-unlocks");
 const statTodayUnlocks = document.getElementById("stat-today-unlocks");
+const dbiDesktop = document.getElementById("dbi-desktop");
+const dbiMobile = document.getElementById("dbi-mobile");
+const dbiTablet = document.getElementById("dbi-tablet");
+
+const historyModalOverlay = document.getElementById("history-modal-overlay");
+const historyModalTitle = document.getElementById("history-modal-title");
+const historyLoading = document.getElementById("history-loading");
+const historyEmpty = document.getElementById("history-empty");
+const historyList = document.getElementById("history-list");
+const historyCloseBtn = document.getElementById("history-close-btn");
 
 const linksTableBody = document.getElementById("links-table-body");
 const linksEmpty = document.getElementById("links-empty");
@@ -61,6 +73,7 @@ const modalSaveBtn = document.getElementById("modal-save-btn");
 let allLinks = []; // cached from realtime listener, for client-side search
 let unsubLinks = null;
 let unsubUnlocksToday = null;
+let unsubDeviceBreakdown = null;
 let saving = false; // spam-click guard for save button
 let deletingIds = new Set(); // spam-click guard per row
 
@@ -159,11 +172,38 @@ function startRealtimeListeners() {
       statTodayUnlocks.textContent = "—";
     }
   );
+
+  // Device breakdown — all-time, based on logged unlock events. Like
+  // "Today's Unlocks", this counts logged events (including ones from
+  // links that were later deleted), so it can differ from the
+  // unlockCount-based "Total Unlocks" figure above — same reason as
+  // discussed for the Today's Unlocks stat.
+  const allUnlocksQuery = query(collection(db, "unlocks"));
+  unsubDeviceBreakdown = onSnapshot(
+    allUnlocksQuery,
+    (snap) => {
+      let desktop = 0, mobile = 0, tablet = 0;
+      snap.forEach((d) => {
+        const type = d.data().deviceType;
+        if (type === "Mobile") mobile++;
+        else if (type === "Tablet") tablet++;
+        else desktop++; // Desktop, or unknown/older entries without deviceType
+      });
+      dbiDesktop.textContent = desktop;
+      dbiMobile.textContent = mobile;
+      dbiTablet.textContent = tablet;
+    },
+    (err) => {
+      console.error(err);
+      dbiDesktop.textContent = dbiMobile.textContent = dbiTablet.textContent = "—";
+    }
+  );
 }
 
 function stopRealtimeListeners() {
   if (unsubLinks) unsubLinks();
   if (unsubUnlocksToday) unsubUnlocksToday();
+  if (unsubDeviceBreakdown) unsubDeviceBreakdown();
 }
 
 function renderTotals() {
@@ -205,6 +245,7 @@ function renderLinksTable() {
       <td>
         <div class="row-actions">
           <button class="btn btn-secondary btn-sm" data-action="copy" data-url="${shareUrl}">📋 Copy</button>
+          <button class="btn btn-secondary btn-sm" data-action="history" data-id="${link.id}" data-title="${escapeHtml(link.title || "Untitled")}">📱 History</button>
           <button class="btn btn-secondary btn-sm" data-action="edit" data-id="${link.id}">✏️ Edit</button>
           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${link.id}">🗑️ Delete</button>
         </div>
@@ -242,6 +283,10 @@ linksTableBody.addEventListener("click", async (e) => {
     if (link) openModal(link);
   }
 
+  if (action === "history") {
+    openHistoryModal(btn.dataset.id, btn.dataset.title);
+  }
+
   if (action === "delete") {
     const id = btn.dataset.id;
     if (deletingIds.has(id)) return; // spam-click guard
@@ -260,6 +305,64 @@ linksTableBody.addEventListener("click", async (e) => {
       deletingIds.delete(id);
     }
   }
+});
+
+// =====================================================================
+// UNLOCK HISTORY MODAL (per link, device/browser/OS log)
+// =====================================================================
+async function openHistoryModal(linkId, title) {
+  historyModalTitle.textContent = `Unlock History — ${title}`;
+  historyList.innerHTML = "";
+  historyEmpty.style.display = "none";
+  historyLoading.style.display = "block";
+  historyModalOverlay.classList.add("show");
+
+  try {
+    // NOTE: this query (where linkId == ... + orderBy timestamp) needs a
+    // Firestore composite index. The first time this runs, if it hasn't
+    // been created yet, Firestore's error message includes a direct link
+    // to auto-create it in the console — just click that link once.
+    const historyQuery = query(
+      collection(db, "unlocks"),
+      where("linkId", "==", linkId),
+      orderBy("timestamp", "desc"),
+      limit(20)
+    );
+    const snap = await getDocs(historyQuery);
+    historyLoading.style.display = "none";
+
+    if (snap.empty) {
+      historyEmpty.style.display = "block";
+      return;
+    }
+
+    snap.forEach((d) => {
+      const data = d.data();
+      const item = document.createElement("div");
+      item.className = "history-item";
+      const deviceLabel = [data.deviceType, data.os, data.browser].filter(Boolean).join(" · ") || "Unknown device";
+      const timeLabel = data.timestamp && data.timestamp.toDate
+        ? data.timestamp.toDate().toLocaleString()
+        : "Just now";
+      item.innerHTML = `
+        <span class="hi-device">${escapeHtml(deviceLabel)}</span>
+        <span class="hi-time">${escapeHtml(timeLabel)}</span>
+      `;
+      historyList.appendChild(item);
+    });
+  } catch (err) {
+    console.error(err);
+    historyLoading.style.display = "none";
+    historyEmpty.textContent = "Could not load history. Check the console — this may need a Firestore index (Firestore will show a link to create it).";
+    historyEmpty.style.display = "block";
+  }
+}
+
+historyCloseBtn.addEventListener("click", () => {
+  historyModalOverlay.classList.remove("show");
+});
+historyModalOverlay.addEventListener("click", (e) => {
+  if (e.target === historyModalOverlay) historyModalOverlay.classList.remove("show");
 });
 
 // =====================================================================

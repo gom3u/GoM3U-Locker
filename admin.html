@@ -4,9 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Link Locker — Admin Panel</title>
-<link rel="stylesheet" href="style.css?v=1.0.1" />
+<!-- theme.js runs before the stylesheet so the saved theme applies with
+     no flash of the wrong theme -->
+<script src="theme.js?v=1.0.2"></script>
+<link rel="stylesheet" href="style.css?v=1.0.2" />
 </head>
 <body class="admin-body">
+
+  <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">☀️</button>
 
   <!-- ================= LOGIN VIEW ================= -->
   <div id="login-view" class="login-wrap">
@@ -59,6 +64,35 @@
             <div class="value" id="stat-today-unlocks">—</div>
           </div>
         </div>
+
+        <div class="panel glass">
+          <div class="panel-header">
+            <h3 style="font-size:16px;">Device Breakdown <span style="font-size:12px;color:var(--text-dim);font-weight:400;">(all-time, logged unlocks)</span></h3>
+          </div>
+          <div class="device-breakdown" id="device-breakdown">
+            <div class="device-breakdown-item">
+              <span class="dbi-icon">🖥️</span>
+              <div>
+                <div class="dbi-label">Desktop</div>
+                <div class="dbi-value" id="dbi-desktop">—</div>
+              </div>
+            </div>
+            <div class="device-breakdown-item">
+              <span class="dbi-icon">📱</span>
+              <div>
+                <div class="dbi-label">Mobile</div>
+                <div class="dbi-value" id="dbi-mobile">—</div>
+              </div>
+            </div>
+            <div class="device-breakdown-item">
+              <span class="dbi-icon">📱</span>
+              <div>
+                <div class="dbi-label">Tablet</div>
+                <div class="dbi-value" id="dbi-tablet">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Links -->
@@ -92,6 +126,19 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- ================= UNLOCK HISTORY MODAL ================= -->
+  <div class="modal-overlay" id="history-modal-overlay">
+    <div class="modal glass" style="max-width:440px;">
+      <h3 id="history-modal-title">Unlock History</h3>
+      <p class="center-msg" id="history-loading" style="margin:14px 0;">Loading…</p>
+      <p class="center-msg" id="history-empty" style="display:none;margin:14px 0;">No unlocks recorded yet for this link.</p>
+      <div class="history-list" id="history-list"></div>
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-secondary" id="history-close-btn">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- ================= ADD/EDIT MODAL ================= -->
@@ -138,6 +185,6 @@
 
   <div id="toast-container"></div>
 
-  <script type="module" src="admin.js?v=1.0.1"></script>
+  <script type="module" src="admin.js?v=1.0.2"></script>
 </body>
 </html>

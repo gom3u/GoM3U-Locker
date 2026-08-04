@@ -10,12 +10,35 @@ Pages.
 ```
 index.html      → user unlock page (reads ?id=xxxxx)
 admin.html       → admin login + dashboard + link management
-style.css        → shared dark-mode glass UI styles
-script.js        → user-side unlock flow logic
-admin.js         → admin panel logic (auth, CRUD, realtime stats)
+style.css        → shared dark/light glass UI styles
+theme.js         → dark/light theme toggle (shared, loads before CSS)
+deviceinfo.js    → lightweight device/OS/browser detection (no PII)
+script.js        → user-side unlock flow logic + anti-fraud session token
+admin.js         → admin panel logic (auth, CRUD, realtime stats, device
+                    breakdown, per-link unlock history)
 firebase.js      → Firebase config + SDK re-exports
 firestore.rules  → security rules to paste into Firebase Console
 ```
+
+## Deploying updates (cache-busting)
+
+GitHub Pages / browsers cache static files aggressively. To make sure
+users see your changes without needing to manually clear their
+browser cache, this project uses a version query string (`?v=X.X.X`)
+on every CSS/JS reference.
+
+**Every time you push an update**, bump the version number in these
+places (find-and-replace the old version with a new one, e.g.
+`1.0.1` → `1.0.2`):
+
+1. `index.html` — `theme.js?v=...`, `style.css?v=...`, `adblock.js?v=...`, `script.js?v=...`
+2. `admin.html` — `theme.js?v=...`, `style.css?v=...`, `admin.js?v=...`
+3. `script.js` — the `firebase.js?v=...` and `deviceinfo.js?v=...` import lines
+4. `admin.js` — the `firebase.js?v=...` import line
+
+Changing the version number makes the browser treat it as a brand-new
+file, so it re-downloads instead of using a stale cached copy — no
+action needed from your users.
 
 ## 1. Create your Firebase project
 
@@ -46,13 +69,33 @@ firestore.rules  → security rules to paste into Firebase Console
 | createdAt    | timestamp | Set automatically on creation            |
 | unlockCount  | number    | Incremented on every completed unlock    |
 
-**`unlocks` collection** — one lightweight doc per completed unlock,
-used only to compute "Today's Unlocks" on the dashboard:
+**`unlocks` collection** — one doc per completed unlock, used for
+"Today's Unlocks", the Dashboard device breakdown, and per-link
+unlock history (Links → 📱 History):
 
-| Field     | Type      |
-|-----------|-----------|
-| linkId    | string    |
-| timestamp | timestamp |
+| Field      | Type      | Notes                              |
+|------------|-----------|-------------------------------------|
+| linkId     | string    |                                      |
+| timestamp  | timestamp |                                      |
+| deviceType | string    | `Desktop` \| `Mobile` \| `Tablet`   |
+| os         | string    | e.g. `Windows`, `Android`, `iOS`    |
+| browser    | string    | e.g. `Chrome`, `Safari`             |
+| sessionId  | string    | Links back to the `sessions` doc    |
+
+**`sessions` collection** — short-lived anti-fraud tokens, one per
+unlock attempt (see "Notes on the security model" below):
+
+| Field    | Type      | Notes                                    |
+|----------|-----------|--------------------------------------------|
+| linkId   | string    |                                              |
+| step1At  | timestamp | Server-set the instant ad 1's 20s finishes  |
+| step2At  | timestamp | Server-set the instant ad 2's 20s finishes  |
+| used     | boolean   | Flipped true once redeemed (single-use)     |
+
+> The per-link history query (`where linkId ==` + `orderBy timestamp`)
+> needs a Firestore composite index. The first time you open 📱
+> History, if it hasn't been created yet, check the browser console —
+> Firestore's error message includes a direct link to auto-create it.
 
 ## 3. Run locally
 
@@ -102,3 +145,21 @@ the branch/folder. No build step required.
 - Both "View Advertisement" buttons disable themselves immediately on
   click and stay disabled through the 20-second countdown to prevent
   spam-clicking; the Copy Link button is similarly debounced.
+- **Anti-fraud session token (devtools/console protection):** every
+  unlock now requires a `sessions` doc that a devtools user can't
+  forge — it's created with a server timestamp when ad 1's real 20s
+  finishes, can only be marked "step 2 done" after a genuine ~18s+
+  server-verified gap, and can only be redeemed (incrementing
+  `unlockCount`) once. This blocks the common abuse case of someone
+  opening the console and calling `updateDoc(... unlockCount+1 ...)`
+  directly in a loop. **It is not unbreakable** — this is a
+  client-only app with no backend, so someone determined enough to
+  script the entire two-step handshake (including the real wait)
+  could still automate an unlock. Closing that last gap requires
+  moving the final unlock step behind a Firebase Cloud Function,
+  which is a reasonable next upgrade if this ever becomes a real
+  problem.
+- After pulling these changes, **re-paste `firestore.rules` into
+  Firebase Console → Firestore Database → Rules and Publish** — the
+  new `sessions` collection rules and the updated `links`/`unlocks`
+  rules only take effect once published there.

@@ -6,10 +6,16 @@
 <title>Link Locker — Unlock Your Link</title>
 <meta name="description" content="Unlock your link in two quick steps." />
 <!-- Cache-busting: bump ?v=X.X.X on every deploy (index.html, admin.html,
-     script.js, admin.js) so users get the update without clearing cache -->
-<link rel="stylesheet" href="style.css?v=1.0.1" />
+     script.js, admin.js, theme.js, deviceinfo.js) so users get the update
+     without clearing cache -->
+<!-- theme.js runs before the stylesheet so the saved theme applies with
+     no flash of the wrong theme -->
+<script src="theme.js?v=1.0.2"></script>
+<link rel="stylesheet" href="style.css?v=1.0.2" />
 </head>
 <body>
+
+  <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">☀️</button>
 
   <div id="app-root" class="card glass">
     <div class="brand"><span class="lock-icon">🔒</span> Link Locker</div>
@@ -113,7 +119,7 @@
     </div>
   </div>
 
-  <script src="adblock.js?v=1.0.1"></script>
-  <script type="module" src="script.js?v=1.0.1"></script>
+  <script src="adblock.js?v=1.0.2"></script>
+  <script type="module" src="script.js?v=1.0.2"></script>
 </body>
 </html>

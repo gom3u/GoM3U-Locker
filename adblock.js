@@ -1,21 +1,31 @@
 // =====================================================================
-// adblock.js — Ad Blocker & DNS-level Ad Blocker Detector (v2, more reliable)
+// adblock.js — Ad Blocker & DNS-level Ad Blocker Detector (v3)
 // =====================================================================
-// Detects two categories of blocking so users can't skip the ad steps:
-//   1. Browser-extension ad blockers (uBlock Origin, AdBlock Plus, etc.)
-//      → detected via a "bait" element these extensions hide with CSS,
-//        AND via a real ad-script <script> tag load failure.
-//   2. DNS-level / network-level ad blocking (Pi-hole, AdGuard DNS,
-//      NextDNS, some VPNs/firewalls) → the same <script> tag test
-//      catches this too, since a blocked DNS lookup / refused
-//      connection fires the tag's onerror event.
+// Detects blocking with THREE independent signals, since relying on a
+// single method is easy to bypass:
 //
-// NOTE: we use a real <script> tag (not fetch) because most extensions
-// intercept it at the network layer and reliably fire onerror — a
-// fetch() in no-cors mode can silently "succeed" (opaque response)
-// even when the request was actually blocked, causing false negatives.
+//   1. Bait element — a hidden div with ad-related class names that
+//      cosmetic filter lists hide via CSS.
 //
-// If either check trips, a full-screen overlay blocks the page until
+//   2. Real ad-network script (Google AdSense) — loaded via a <script>
+//      tag. IMPORTANT: some blockers (AdGuard, newer uBlock builds)
+//      don't fail the request outright — they return a fake empty
+//      200 response so `onload` still fires. To catch this, after
+//      onload we verify the script actually did what the real file
+//      does (define `window.adsbygoogle`). If that's missing, it was
+//      stubbed out → still counts as blocked.
+//
+//   3. Self-hosted decoy script (ads/banner-ads.js) — a first-party
+//      file whose *path* matches generic ad-related patterns that
+//      URL-pattern filter lists block regardless of domain. This is
+//      much harder for a blocker to "fake" a clean response for,
+//      since it's not a well-known ad-network URL that a spoofing
+//      rule would specifically target.
+//
+// DNS-level blockers (Pi-hole, AdGuard DNS, NextDNS) are caught by
+// signal #2, since the DNS lookup itself fails and fires onerror.
+//
+// If ANY signal trips, a full-screen overlay blocks the page until
 // the user disables their blocker and clicks "Recheck".
 // =====================================================================
 
@@ -33,11 +43,10 @@
     document.body.style.overflow = "";
   }
 
-  // ---- Method 1: bait element (classic extension-based ad blockers) ----
+  // ---- Signal 1: bait element (cosmetic/CSS-based ad blockers) ----
   function checkBaitElement() {
     return new Promise((resolve) => {
       const bait = document.createElement("div");
-      // Class names commonly targeted by ad-blocking filter lists
       bait.className =
         "adsbox ad-banner ads ad-placement textads banner_ad adunit";
       bait.style.cssText =
@@ -58,8 +67,10 @@
     });
   }
 
-  // ---- Method 2: real ad-script tag load (catches extensions + DNS blockers) ----
-  function checkAdScriptTag() {
+  // Generic script-tag loader used by both signal 2 and 3 below.
+  // `verifyFn` runs after onload to confirm the script wasn't stubbed
+  // out with a fake empty 200 response.
+  function loadAndVerify(url, verifyFn, timeoutMs = 2500) {
     return new Promise((resolve) => {
       let settled = false;
       const script = document.createElement("script");
@@ -72,29 +83,43 @@
         resolve(blocked);
       };
 
-      // If neither onload nor onerror fires within 2.5s (e.g. DNS hang),
-      // treat it as blocked.
-      const timer = setTimeout(() => finish(true), 2500);
+      const timer = setTimeout(() => finish(true), timeoutMs);
 
-      script.onload = () => finish(false); // script loaded fine → not blocked
-      script.onerror = () => finish(true); // blocked by extension or DNS/network
+      script.onload = () => {
+        // Give the script a tick to execute before we check its effects
+        setTimeout(() => finish(!verifyFn()), 30);
+      };
+      script.onerror = () => finish(true);
 
-      // Cache-bust so browsers/CDNs don't serve a stale cached result
-      script.src =
-        "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?cb=" +
-        Date.now();
+      script.src = url + (url.includes("?") ? "&" : "?") + "cb=" + Date.now();
       script.async = true;
       document.body.appendChild(script);
     });
   }
 
+  // ---- Signal 2: real Google AdSense script ----
+  function checkAdNetworkScript() {
+    return loadAndVerify(
+      "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
+      () => typeof window.adsbygoogle !== "undefined"
+    );
+  }
+
+  // ---- Signal 3: self-hosted decoy with an ad-like path/filename ----
+  function checkDecoyScript() {
+    // Resolve relative to this page so it works in any subfolder/domain
+    const decoyUrl = new URL("ads/banner-ads.js", window.location.href).href;
+    return loadAndVerify(decoyUrl, () => window.__abdReady === true);
+  }
+
   async function runDetection() {
-    const [baitBlocked, scriptBlocked] = await Promise.all([
+    const [baitBlocked, adNetworkBlocked, decoyBlocked] = await Promise.all([
       checkBaitElement(),
-      checkAdScriptTag(),
+      checkAdNetworkScript(),
+      checkDecoyScript(),
     ]);
 
-    if (baitBlocked || scriptBlocked) {
+    if (baitBlocked || adNetworkBlocked || decoyBlocked) {
       showOverlay();
     } else {
       hideOverlay();

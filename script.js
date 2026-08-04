@@ -22,7 +22,9 @@ import {
   collection,
   addDoc,
   serverTimestamp,
-} from "./firebase.js?v=1.0.1";
+  runTransaction,
+} from "./firebase.js?v=1.0.2";
+import { getDeviceInfo } from "./deviceinfo.js?v=1.0.2";
 
 // ---------- DOM refs ----------
 const loadingState = document.getElementById("loading-state");
@@ -65,6 +67,41 @@ let realUrlPrivate = null; // kept out of the DOM entirely
 let linkDocId = null;
 let step1Clicking = false; // spam-click guards
 let step2Clicking = false;
+
+// ---------- Anti-fraud session token ----------
+// See firestore.rules for the server-enforced half of this: a random
+// devtools call to bump unlockCount is rejected unless it's accompanied
+// by a `sessions` doc that genuinely went through step1 -> (18s+ real
+// gap, server-timestamped) -> step2, and hasn't been redeemed before.
+let sessionId = null;
+
+async function beginSession() {
+  try {
+    const ref = await addDoc(collection(db, "sessions"), {
+      linkId: linkDocId,
+      step1At: serverTimestamp(),
+    });
+    sessionId = ref.id;
+  } catch (err) {
+    // Non-fatal: the unlock UX still works, but this unlock may not be
+    // counted in stats if the session can't be established (e.g. briefly
+    // offline right at step 1).
+    console.warn("Could not start anti-fraud session:", err);
+    sessionId = null;
+  }
+}
+
+async function completeSessionStep2() {
+  if (!sessionId) return;
+  try {
+    await updateDoc(doc(db, "sessions", sessionId), {
+      step2At: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("Could not finalize anti-fraud session:", err);
+    sessionId = null;
+  }
+}
 
 // ---------- Toast helper ----------
 function showToast(message, type = "success") {
@@ -222,6 +259,10 @@ btnStep1.addEventListener("click", () => {
       step2Block.classList.add("active");
       btnStep2.disabled = false;
       step1Clicking = false;
+
+      // Start the anti-fraud session token now — the real 20s just
+      // elapsed, this timestamp becomes the server-verified anchor.
+      beginSession();
     },
     onAbort: () => {
       showToast(
@@ -270,7 +311,12 @@ btnStep2.addEventListener("click", () => {
       unlockedBox.classList.add("show");
       step2Clicking = false;
 
-      recordUnlock();
+      // The unlocked UI above is never blocked by this — stats recording
+      // is best-effort so a network hiccup never breaks the user's unlock.
+      (async () => {
+        await completeSessionStep2();
+        recordUnlock();
+      })();
     },
     onAbort: () => {
       showToast(
@@ -288,14 +334,39 @@ btnStep2.addEventListener("click", () => {
 });
 
 // ---------- Record unlock stats (fire-and-forget, non-blocking) ----------
+// Uses a Firestore transaction so the session gets marked "used", the
+// link's unlockCount goes up, and the device-info log entry is written
+// atomically together — see firestore.rules for the server-side half of
+// the session-token check.
 async function recordUnlock() {
+  if (!sessionId) {
+    console.warn("No valid anti-fraud session — this unlock was not counted in stats.");
+    return;
+  }
+
+  const device = getDeviceInfo();
+
   try {
-    await updateDoc(doc(db, "links", linkDocId), {
-      unlockCount: increment(1),
-    });
-    await addDoc(collection(db, "unlocks"), {
-      linkId: linkDocId,
-      timestamp: serverTimestamp(),
+    const linkRef = doc(db, "links", linkDocId);
+    const sessionRef = doc(db, "sessions", sessionId);
+    const unlockLogRef = doc(collection(db, "unlocks"));
+
+    await runTransaction(db, async (tx) => {
+      const sessionSnap = await tx.get(sessionRef);
+      if (!sessionSnap.exists() || sessionSnap.data().used === true || !sessionSnap.data().step2At) {
+        throw new Error("Session is not valid for redemption.");
+      }
+
+      tx.update(sessionRef, { used: true });
+      tx.update(linkRef, { unlockCount: increment(1), lastSessionId: sessionId });
+      tx.set(unlockLogRef, {
+        linkId: linkDocId,
+        timestamp: serverTimestamp(),
+        deviceType: device.deviceType,
+        os: device.os,
+        browser: device.browser,
+        sessionId: sessionId,
+      });
     });
   } catch (err) {
     // Non-critical — don't block the user's unlock experience
