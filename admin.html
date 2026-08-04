@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Link Locker — Admin Panel</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="admin-body">
+
+  <!-- ================= LOGIN VIEW ================= -->
+  <div id="login-view" class="login-wrap">
+    <div class="card glass">
+      <div class="brand"><span class="lock-icon">🔐</span> Link Locker Admin</div>
+      <h1 class="title">Admin Login</h1>
+      <p class="subtitle">Sign in to manage your links</p>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input class="form-input" type="email" id="login-email" required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input class="form-input" type="password" id="login-password" required autocomplete="current-password" />
+        </div>
+        <p class="center-msg" id="login-error" style="display:none;color:#f87171;margin-bottom:10px;"></p>
+        <button class="btn btn-primary" type="submit" id="login-btn">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= ADMIN SHELL ================= -->
+  <div id="admin-view" class="admin-shell" style="display:none;">
+    <aside class="sidebar glass">
+      <h2>🔒 Link Locker</h2>
+      <a class="nav-link active" data-view="dashboard-view">📊 Dashboard</a>
+      <a class="nav-link" data-view="links-view">🔗 Links</a>
+      <a class="nav-link" id="logout-btn" style="margin-top:auto;">🚪 Logout</a>
+    </aside>
+
+    <main class="admin-main">
+      <!-- Dashboard -->
+      <section id="dashboard-view">
+        <div class="admin-header">
+          <h1>Dashboard</h1>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card glass">
+            <div class="label">Total Links</div>
+            <div class="value" id="stat-total-links">—</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="label">Total Unlocks</div>
+            <div class="value" id="stat-total-unlocks">—</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="label">Today's Unlocks</div>
+            <div class="value" id="stat-today-unlocks">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Links -->
+      <section id="links-view" style="display:none;">
+        <div class="admin-header">
+          <h1>Links</h1>
+          <button class="btn btn-primary btn-sm" id="add-link-btn">＋ Add Link</button>
+        </div>
+
+        <div class="panel glass">
+          <div class="panel-header">
+            <input class="search-input" id="search-input" placeholder="Search links by title…" style="max-width:280px;" />
+          </div>
+          <div class="table-wrap">
+            <table class="links-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Unlocks</th>
+                  <th>Share URL</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="links-table-body">
+                <!-- populated by admin.js -->
+              </tbody>
+            </table>
+          </div>
+          <p class="center-msg" id="links-empty" style="display:none;margin-top:14px;">No links yet — add your first one.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= ADD/EDIT MODAL ================= -->
+  <div class="modal-overlay" id="link-modal-overlay">
+    <div class="modal glass">
+      <h3 id="modal-title">Add Link</h3>
+      <form id="link-form">
+        <input type="hidden" id="edit-doc-id" />
+        <div class="form-group">
+          <label for="f-title">Title</label>
+          <input class="form-input" id="f-title" required />
+        </div>
+        <div class="form-group">
+          <label for="f-realUrl">Real URL</label>
+          <input class="form-input" id="f-realUrl" type="url" required placeholder="https://example.com/secret-file" />
+        </div>
+        <div class="form-group">
+          <label for="f-ads1">Advertisement URL 1</label>
+          <input class="form-input" id="f-ads1" type="url" required placeholder="https://ads-network.com/ad1" />
+        </div>
+        <div class="form-group">
+          <label for="f-ads2">Advertisement URL 2</label>
+          <input class="form-input" id="f-ads2" type="url" required placeholder="https://ads-network.com/ad2" />
+        </div>
+        <div class="form-group">
+          <label for="f-buttonText">Button Text</label>
+          <input class="form-input" id="f-buttonText" required placeholder="View Advertisement" />
+        </div>
+        <div class="form-group">
+          <label for="f-status">Status</label>
+          <select class="form-input" id="f-status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <p class="center-msg" id="form-error" style="display:none;color:#f87171;"></p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
