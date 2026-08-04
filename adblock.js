@@ -70,7 +70,7 @@
   // Generic script-tag loader used by both signal 2 and 3 below.
   // `verifyFn` runs after onload to confirm the script wasn't stubbed
   // out with a fake empty 200 response.
-  function loadAndVerify(url, verifyFn, timeoutMs = 8000) {
+  function loadAndVerify(url, verifyFn, timeoutMs = 2500) {
     return new Promise((resolve) => {
       let settled = false;
       const script = document.createElement("script");
@@ -139,5 +139,5 @@
   }
 
   // Periodic re-check in case the user toggles their blocker mid-session
-  setInterval(runDetection, 20000);
+  setInterval(runDetection, 10000);
 })();
