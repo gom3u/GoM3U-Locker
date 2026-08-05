@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Link Locker — Unlock Your Link</title>
+<meta name="description" content="Unlock your link in two quick steps." />
+<!-- Cache-busting: bump ?v=X.X.X on every deploy (index.html, admin.html,
+     script.js, admin.js, theme.js, deviceinfo.js) so users get the update
+     without clearing cache -->
+<!-- theme.js runs before the stylesheet so the saved theme applies with
+     no flash of the wrong theme -->
+<script src="theme.js?v=1.0.5"></script>
+<link rel="stylesheet" href="style.css?v=1.0.5" />
+</head>
+<body>
+
+  <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">☀️</button>
+
+  <div id="app-root" class="card glass">
+    <div class="brand"><span class="lock-icon">🔒</span> Link Locker</div>
+
+    <!-- Loading state while we fetch the link doc -->
+    <div id="loading-state">
+      <div class="loader"></div>
+      <p class="center-msg">Loading your link…</p>
+    </div>
+
+    <!-- Shown if the id is missing / invalid / inactive -->
+    <div id="error-state" style="display:none;">
+      <h1 class="title">Link Not Found</h1>
+      <p class="subtitle" id="error-message">
+        This link is invalid, disabled, or no longer exists.
+      </p>
+    </div>
+
+    <!-- Main unlock flow -->
+    <div id="main-state" style="display:none;">
+      <h1 class="title">Unlock Your Link</h1>
+      <p class="subtitle" id="link-title-sub">Complete 2 quick steps to continue</p>
+
+      <!-- Progress indicator -->
+      <div class="progress">
+        <div class="step active" id="progress-step-1">
+          <div class="dot">1</div>
+        </div>
+        <div class="line"></div>
+        <div class="step" id="progress-step-2">
+          <div class="dot">2</div>
+        </div>
+        <div class="line"></div>
+        <div class="step" id="progress-step-done">
+          <div class="dot">✓</div>
+        </div>
+      </div>
+      <p class="center-msg" id="progress-label" style="margin-bottom:20px;">Step 1 of 2</p>
+
+      <!-- Step 1 -->
+      <div class="step-block active" id="step-1-block">
+        <button class="btn btn-primary" id="btn-step-1">
+          <span>▶</span> <span id="btn-step-1-label">View Advertisement 1</span>
+        </button>
+        <div class="countdown-wrap" id="countdown-1">
+          Please wait <span id="countdown-1-num">20</span>s…
+          <div class="countdown-bar"><span id="countdown-1-bar"></span></div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-block" id="step-2-block">
+        <button class="btn btn-primary" id="btn-step-2" disabled>
+          <span>▶</span> <span id="btn-step-2-label">View Advertisement 2</span>
+        </button>
+        <div class="countdown-wrap" id="countdown-2">
+          Please wait <span id="countdown-2-num">20</span>s…
+          <div class="countdown-bar"><span id="countdown-2-bar"></span></div>
+        </div>
+      </div>
+
+      <!-- Unlocked -->
+      <div class="unlocked-box" id="unlocked-box">
+        <div class="unlocked-icon">✅</div>
+        <h2 class="title" style="font-size:20px;">Link Unlocked</h2>
+        <button class="btn btn-success" id="btn-copy">
+          📋 Copy Link
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <!-- Early-close warning modal -->
+  <div class="modal-overlay" id="early-close-overlay">
+    <div class="modal glass" style="max-width:380px; text-align:center;">
+      <div class="unlocked-icon">⚠️</div>
+      <h3 style="margin-top:10px;">Advertisement Closed Early</h3>
+      <p class="subtitle" style="margin-bottom:20px;">
+        You need to keep the advertisement open for the full 20 seconds.
+        Please try again and wait for the timer to finish.
+      </p>
+      <button class="btn btn-primary" id="early-close-retry-btn">Try Again</button>
+    </div>
+  </div>
+
+  <!-- Ad-blocker / DNS-level blocker overlay -->
+  <div id="adblock-overlay" class="adblock-overlay">
+    <div class="card glass" style="max-width:420px;">
+      <div class="unlocked-icon">🚫</div>
+      <h1 class="title" style="margin-top:10px;">Ad Blocker Detected</h1>
+      <p class="subtitle">
+        This site is supported by ads. Please disable your ad blocker or
+        DNS-level ad blocking (e.g. Pi-hole, AdGuard DNS, NextDNS) for
+        this site, then click below to continue.
+      </p>
+      <button class="btn btn-primary" id="adblock-retry-btn">
+        I've Disabled It — Recheck
+      </button>
+    </div>
+  </div>
+
+  <script src="adblock.js?v=1.0.5"></script>
+  <script type="module" src="script.js?v=1.0.5"></script>
+</body>
+</html>
