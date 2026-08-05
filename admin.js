@@ -21,7 +21,7 @@ import {
   getDocs,
   serverTimestamp,
   Timestamp,
-} from "./firebase.js?v=1.0.2";
+} from "./firebase.js?v=1.0.8";
 
 // ---------- DOM refs ----------
 const loginView = document.getElementById("login-view");

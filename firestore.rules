@@ -5,55 +5,22 @@ rules_version = '2';
 // Paste this into Firebase Console → Firestore Database → Rules
 // =====================================================================
 //
-// SECURITY MODEL NOTE (session-token gate):
-// This app is 100% client-side (no backend/Cloud Function). These rules
-// add a "session token" gate so a random unlockCount increment sent from
-// a browser console/devtools can't succeed on its own — it must first
-// prove, via server-verified timestamps, that a matching `sessions`
-// document went through both ad steps in order with a real time gap
-// between them. This raises the bar significantly against casual abuse,
-// but it is NOT unbreakable: someone willing to script the full two-step
-// handshake (create session -> wait -> mark step2 -> transaction) could
-// still automate it. True elimination of that risk requires moving the
-// final unlock step behind a Cloud Function. Documented as a tradeoff.
+// SECURITY MODEL NOTE:
+// This app is 100% client-side (no backend/Cloud Function). The public
+// unlock flow is allowed to increment a link's `unlockCount` by exactly
+// +1 per write, and to write a device-info log entry — nothing else.
+// A session-token gate (requiring server-timestamped proof that both ad
+// steps were watched, with a real time gap between them) was tried, but
+// its multiple sequential round-trip writes proved unreliable on slow/
+// unstable mobile connections and caused real unlocks to go uncounted —
+// a worse outcome than the fraud risk it guarded against. So this is a
+// deliberate, accepted tradeoff: someone willing to open devtools and
+// call these same writes directly could inflate the count. True
+// elimination of that risk requires moving the final unlock step behind
+// a Cloud Function.
 // =====================================================================
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ---------------------------------------------------------------
-    // sessions collection — short-lived proof-of-ad-view tokens
-    //   step1: created the instant the first 20s ad countdown finishes.
-    //   step2: set the instant the second 20s ad countdown finishes —
-    //          only allowed once, and only after step1's real elapsed
-    //          time (checked against request.time, which the client
-    //          cannot fake or backdate).
-    //   used:  flipped to true inside the same transaction that
-    //          increments the link's unlockCount, so a session can be
-    //          redeemed at most once.
-    // ---------------------------------------------------------------
-    match /sessions/{sessionId} {
-      allow create: if request.resource.data.keys().hasOnly(['linkId', 'step1At'])
-        && request.resource.data.linkId is string
-        && request.resource.data.step1At == request.time;
-
-      // Mark step 2 complete (only once, only after a real ~20s gap),
-      // OR flip "used" to true (only once, only after step2 is set).
-      allow update: if
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['step2At']) &&
-          !('step2At' in resource.data) &&
-          request.resource.data.step2At == request.time &&
-          request.time > resource.data.step1At + duration.value(18, 's')
-        ) || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used']) &&
-          resource.data.used != true &&
-          request.resource.data.used == true &&
-          'step2At' in resource.data
-        );
-
-      allow get: if true; // needed so the links/{linkId} rule below can look this doc up
-      allow list, delete: if request.auth != null; // admin cleanup only
-    }
 
     // ---------------------------------------------------------------
     // links collection
@@ -61,10 +28,9 @@ service cloud.firestore {
     //     show ads/title and, after unlock, the real URL) — but only
     //     documents can be fetched by exact ID; listing/browsing all
     //     links is blocked for non-admins.
-    //   - Only authenticated admins can CREATE / UPDATE / DELETE links,
-    //     EXCEPT the public unlock flow is allowed to increment
-    //     `unlockCount` only — and only when accompanied by a valid,
-    //     unused, fully-completed session token (see sessions above).
+    //   - Only authenticated admins can CREATE / UPDATE (most fields) /
+    //     DELETE links, EXCEPT the public unlock flow is allowed to
+    //     increment `unlockCount` by exactly +1 and nothing else.
     // ---------------------------------------------------------------
     match /links/{linkId} {
       allow get: if true; // fetch by known ID (index.html)
@@ -74,17 +40,10 @@ service cloud.firestore {
 
       allow update: if request.auth != null
         || (
-          // Public "unlock" increments are restricted to ONLY the
-          // unlockCount field changing by exactly +1, AND require a
-          // matching completed, not-yet-used session token.
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['unlockCount', 'lastSessionId']) &&
-          request.resource.data.unlockCount == resource.data.unlockCount + 1 &&
-          request.resource.data.lastSessionId is string &&
-          exists(/databases/$(database)/documents/sessions/$(request.resource.data.lastSessionId)) &&
-          get(/databases/$(database)/documents/sessions/$(request.resource.data.lastSessionId)).data.linkId == linkId &&
-          'step2At' in get(/databases/$(database)/documents/sessions/$(request.resource.data.lastSessionId)).data &&
-          get(/databases/$(database)/documents/sessions/$(request.resource.data.lastSessionId)).data.used != true
+          // Public "unlock" increments: ONLY unlockCount may change,
+          // and only by exactly +1 per write.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlockCount']) &&
+          request.resource.data.unlockCount == resource.data.unlockCount + 1
         );
     }
 
@@ -94,7 +53,7 @@ service cloud.firestore {
     // ---------------------------------------------------------------
     match /unlocks/{unlockId} {
       allow create: if request.resource.data.keys().hasOnly(
-          ['linkId', 'timestamp', 'deviceType', 'os', 'browser', 'sessionId']
+          ['linkId', 'timestamp', 'deviceType', 'os', 'browser']
         )
         && request.resource.data.linkId is string
         && request.resource.data.deviceType is string
