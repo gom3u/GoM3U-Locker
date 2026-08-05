@@ -23,8 +23,8 @@ import {
   addDoc,
   serverTimestamp,
   runTransaction,
-} from "./firebase.js?v=1.0.2";
-import { getDeviceInfo } from "./deviceinfo.js?v=1.0.2";
+} from "./firebase.js?v=1.0.6";
+import { getDeviceInfo } from "./deviceinfo.js?v=1.0.6";
 
 // ---------- DOM refs ----------
 const loadingState = document.getElementById("loading-state");
@@ -88,6 +88,8 @@ async function beginSession() {
     // offline right at step 1).
     console.warn("Could not start anti-fraud session:", err);
     sessionId = null;
+    // TEMP DEBUG — remove once the root cause is confirmed:
+    showToast("DEBUG session1: " + (err.code || err.message || String(err)), "error");
   }
 }
 
@@ -100,6 +102,8 @@ async function completeSessionStep2() {
   } catch (err) {
     console.warn("Could not finalize anti-fraud session:", err);
     sessionId = null;
+    // TEMP DEBUG — remove once the root cause is confirmed:
+    showToast("DEBUG session2: " + (err.code || err.message || String(err)), "error");
   }
 }
 
@@ -371,6 +375,8 @@ async function recordUnlock() {
   } catch (err) {
     // Non-critical — don't block the user's unlock experience
     console.warn("Could not record unlock stat:", err);
+    // TEMP DEBUG — remove once the root cause is confirmed:
+    showToast("DEBUG: " + (err.code || err.message || String(err)), "error");
   }
 }
 
