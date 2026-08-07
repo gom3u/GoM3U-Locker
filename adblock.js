@@ -15,8 +15,8 @@
 //      does (define `window.adsbygoogle`). If that's missing, it was
 //      stubbed out → still counts as blocked.
 //
-//   3. Self-hosted decoy script (ads/banner-ads.js) — a first-party
-//      file whose *path* matches generic ad-related patterns that
+//   3. Self-hosted decoy script (banner-ads.js) — a first-party
+//      file whose *filename* matches generic ad-related patterns that
 //      URL-pattern filter lists block regardless of domain. This is
 //      much harder for a blocker to "fake" a clean response for,
 //      since it's not a well-known ad-network URL that a spoofing
@@ -105,10 +105,12 @@
     );
   }
 
-  // ---- Signal 3: self-hosted decoy with an ad-like path/filename ----
+  // ---- Signal 3: self-hosted decoy with an ad-like filename ----
   function checkDecoyScript() {
-    // Resolve relative to this page so it works in any subfolder/domain
-    const decoyUrl = new URL("ads/banner-ads.js", window.location.href).href;
+    // Resolve relative to this page so it works in any subfolder/domain.
+    // Lives at the site root (not in an ads/ subfolder) to avoid
+    // colliding with any existing "ads" file/folder in the repo.
+    const decoyUrl = new URL("banner-ads.js", window.location.href).href;
     return loadAndVerify(decoyUrl, () => window.__abdReady === true);
   }
 
